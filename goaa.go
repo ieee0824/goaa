@@ -5,8 +5,8 @@ import (
 	"image"
 	"image/color"
 
-	"github.com/aybabtme/rgbterm"
 	"github.com/disintegration/imaging"
+	"github.com/ieee0824/goaa/util"
 	"github.com/nfnt/resize"
 )
 
@@ -110,36 +110,48 @@ func ConvertGray(img image.Image) (*image.Gray16, error) {
 	return dest, nil
 }
 
-func ConvertASCII(img image.Image) ([]string, error) {
+var beforeFrame *util.Frame
+
+func ConvertASCII(img image.Image) (*util.Frame, error) {
 	if img.Bounds().Max.X > 800 {
 		img = resize.Resize(800, 0, img, resize.Lanczos3)
 	}
 	if img.Bounds().Max.Y > 800 {
 		img = resize.Resize(0, 800, img, resize.Lanczos3)
 	}
-	ret := []string{}
+	ret := util.Frame{}
 	gray, err := ConvertGray(imaging.AdjustContrast(imaging.Sharpen(img, 50), 10))
 	if err != nil {
 		return nil, err
 	}
 
 	var buffer = [2][2]uint16{}
-
 	for y := gray.Bounds().Min.Y; y < gray.Bounds().Max.Y; y += 2 {
-		line := ""
+		var line util.Line
 		for x := gray.Bounds().Min.X; x < gray.Bounds().Max.X; x++ {
 			buffer[0] = [2]uint16{gray.At(x, y).(color.Gray16).Y, gray.At(x+1, y).(color.Gray16).Y}
 			buffer[1] = [2]uint16{gray.At(x, y+1).(color.Gray16).Y, gray.At(x+1, y+1).(color.Gray16).Y}
 			r, g, b, _ := img.At(x, y).RGBA()
-			line += rgbterm.FgString(ConvertString(buffer), uint8(r>>8), uint8(g>>8), uint8(b>>8))
+			//c := util.Char{C: rgbterm.FgString(, , , )}
+			c := util.Char{C: ConvertString(buffer), R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8)}
+			if beforeFrame != nil {
+				beforeChar := beforeFrame.Lines[len(ret.Lines)].Chars[len(line.Chars)]
+				changeFlag := (c.C != beforeChar.C) || (c.R != beforeChar.R || c.G != beforeChar.G || c.B != beforeChar.B)
+				c.IsChangee = changeFlag
+			} else {
+				c.IsChangee = true
+			}
+			line.Chars = append(line.Chars, c)
 		}
-		ret = append(ret, line)
+		ret.Lines = append(ret.Lines, line)
 	}
-	return ret, nil
+	beforeFrame = &ret
+	return &ret, nil
 }
 
 func ConvertString(p [2][2]uint16) string {
 	var pattern uint16
+
 	for y := 0; y < 2; y++ {
 		for x := 0; x < 2; x++ {
 			pattern |= checkColorGroup(p[y][x])

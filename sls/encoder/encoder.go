@@ -16,7 +16,8 @@ import (
 	"strings"
 
 	"github.com/ieee0824/goaa"
-	"github.com/ieee0824/goaa/sls/util"
+	"github.com/ieee0824/goaa/util"
+	"github.com/nfnt/resize"
 )
 
 var (
@@ -34,8 +35,8 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	queue := make(chan string, *rate**chank*2)
-	conf := utli.SlsConf{*rate, *chank}
+	queue := make(chan util.Frame, *rate**chank*2)
+	conf := util.SlsConf{*rate, *chank}
 	bin, err := json.Marshal(conf)
 	if err != nil {
 		log.Fatalln(err)
@@ -55,11 +56,12 @@ func main() {
 			if err != nil {
 				log.Fatalln(err)
 			}
-			imgstrs, err := goaa.ConvertASCII(img)
+			img = resize.Resize(0, 92, img, resize.Lanczos3)
+			frame, err := goaa.ConvertASCII(img)
 			if err != nil {
 				log.Fatalln(err)
 			}
-			queue <- strings.Join(imgstrs, "\n")
+			queue <- *frame
 		}
 		close(queue)
 	}()
@@ -68,26 +70,26 @@ func main() {
 	counter := 0
 	for {
 		if frame, ok := <-queue; ok {
-			c.Data = append(c.Data, frame)
+			c.Frames = append(c.Frames, frame)
 		} else {
-			if len(c.Data) != 0 {
+			if len(c.Frames) != 0 {
 				bin, err := json.Marshal(c)
 				if err != nil {
 					log.Fatalln(err)
 				}
-				err = ioutil.WriteFile(fmt.Sprintf(*out+"/%05d.json.gz", counter), compress(bin), 0644)
+				err = ioutil.WriteFile(fmt.Sprintf(*out+"/%05d.sls", counter), compress(bin), 0644)
 				if err != nil {
 					log.Fatalln(err)
 				}
 			}
 			break
 		}
-		if len(c.Data) == *chank {
+		if len(c.Frames) == *chank {
 			bin, err := json.Marshal(c)
 			if err != nil {
 				log.Fatalln(err)
 			}
-			err = ioutil.WriteFile(fmt.Sprintf(*out+"/%05d.json.gz", counter), compress(bin), 0644)
+			err = ioutil.WriteFile(fmt.Sprintf(*out+"/%05d.sls", counter), compress(bin), 0644)
 			if err != nil {
 				log.Fatalln(err)
 			}

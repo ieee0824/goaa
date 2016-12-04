@@ -8,11 +8,11 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"sync"
-	"time"
 
 	tm "github.com/buger/goterm"
-	"github.com/ieee0824/goaa/sls/util"
+	"github.com/ieee0824/goaa/util"
 )
 
 type downloadData struct {
@@ -77,6 +77,8 @@ func deCompress(bin []byte) ([]byte, error) {
 }
 
 func main() {
+	tm.Clear()
+	tm.Flush()
 
 	var wg sync.WaitGroup
 	list, _ := getList()
@@ -94,6 +96,7 @@ func main() {
 			q <- name
 		}
 		close(q)
+		wg.Wait()
 	}()
 
 	counter := 0
@@ -108,11 +111,20 @@ func main() {
 			if err != nil {
 				log.Fatalln(err)
 			}
-			for _, s := range c.Data {
-				tm.MoveCursor(0, 0)
-				fmt.Println(s)
-				time.Sleep(10 * time.Millisecond)
-				tm.Flush()
+			for _, frame := range c.Frames {
+				for y, line := range frame.Lines {
+					buf := ""
+					for x, char := range line.Chars {
+						if char.IsChangee {
+							s := tm.MoveTo(char.C, x, y)
+							buf += s
+						} else {
+							fmt.Print(buf)
+							buf = ""
+						}
+					}
+					fmt.Fprint(os.Stdout, buf)
+				}
 			}
 
 			counter++
